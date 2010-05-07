@@ -3,31 +3,33 @@
 #include <string.h>
 #include <math.h>
 #include <memory.h>
-//#include <conio.h>
 #include <fstream>
 #include <iostream>
-//#include <windows.h>
-//#include <Shellapi.h>
 #include "vectormath.h"
+
+#ifdef WIN32
+#include <windows.h>
+#include <Shellapi.h>
+#endif
 
 using namespace std;
 
 #define WIDTH 640
 #define HEIGHT 480
 #define COLORS 255
-#define DEFAULTCOLOR 0.3
+#define DEFAULTCOLOR 0.0
 #define K0 0.1
 #define K1 0.2
-#define K2 0.5
-#define LIGHT 150
+#define K2 0.4
+#define LIGHT 255
 const char* mode = "P";
 #define P_FORMAT 2
 
 
 const char *pgmname = "./img.pgm";
 const char *modelfile = "./model.model";
-
-
+const char *paramstrm = "-m";
+const char *paramstri = "-i";
 
 
 typedef struct colorstruct
@@ -60,12 +62,13 @@ unsigned char pictureArray[WIDTH][HEIGHT];
 
 
 
-void savepgm(const char *filename, int format, int width, int height, int maximum)
+int savepgm(const char *filename, int format, int width, int height, int maximum)
 {
 	ofstream out(filename);
 	if (!out)
 	{
-		cout << "Cannot open file\n";
+		cout << "Cannot open file "<<filename<<"\n";
+		return 0;
 	}
 	out << mode << format << endl;
 	out << width << " " << height << endl;
@@ -82,11 +85,14 @@ void savepgm(const char *filename, int format, int width, int height, int maximu
 		//out << rand()%maximum << endl;
 	}
 	out.close();
+	return 1;
 }
-/*void openpgm()
+#ifdef WIN32
+void openpgm()
 {
 	ShellExecute(NULL,L"Open",L"D:\\Program Files\\IrfanView\\i_view32.exe",L"H:\\raytracing\\Raytracing\\Raytracing\\img.pgm",NULL,SW_SHOWNORMAL);
-}*/
+}
+#endif
 
 
 
@@ -96,16 +102,17 @@ void savepgm(const char *filename, int format, int width, int height, int maximu
 //x y z of camera
 //x y z of cameratarget
 //number of triangles
-//x1 y1 z1 x2 y2 z2 x3 y3 z3
+//x1 y1 z1 x2 y2 z2 x3 y3 z3 Color (-1 == mirror)
 //...
 
-void openmodel(const char *filename, model *ModelPoint)
+int openmodel(const char *filename, model *ModelPoint)
 {
 	int n = 0;
 	ifstream in(filename);
 	if (!in)
 	{
-		cout <<"Cannot open file\n";
+		cout <<"Cannot open file "<<filename<<"\n";
+		return 0;
 	}
     in >> ModelPoint->lightspot.x;
 	in >> ModelPoint->lightspot.y;
@@ -129,9 +136,10 @@ void openmodel(const char *filename, model *ModelPoint)
 		in >> ModelPoint->triangles[i].C.x;
 		in >> ModelPoint->triangles[i].C.y;
 		in >> ModelPoint->triangles[i].C.z;
-		ModelPoint->triangles[i].Color.g = DEFAULTCOLOR;
+		in >> ModelPoint->triangles[i].Color.g;
 	}
 	in.close();
+	return 1;
     
 }
 
@@ -172,7 +180,7 @@ bool triangleIntersect(vector &resultpoint,double &resultt, double &mint, const 
 			cloneray.z = ray.z;
 			add(resultpoint,camera,scale(cloneray,resultt));
 			//scale(ray,1/resultt);
-			if((abs(normal.z)>=abs(normal.y))&&(abs(normal.z)>=abs(normal.x)))
+			if((fabs(normal.z)>=fabs(normal.y))&&(fabs(normal.z)>=fabs(normal.x)))
 			{
 			j1 = (resultpoint.y - tr.A.y)*(tr.B.x - tr.A.x) - (resultpoint.x - tr.A.x)*(tr.B.y - tr.A.y);
 			j2 = (resultpoint.y - tr.B.y)*(tr.C.x - tr.B.x) - (resultpoint.x - tr.B.x)*(tr.C.y - tr.B.y);
@@ -185,7 +193,7 @@ bool triangleIntersect(vector &resultpoint,double &resultt, double &mint, const 
 			}
 			else 
 			{
-				if((abs(normal.y)>=abs(normal.z))&&(abs(normal.y)>=abs(normal.x)))
+				if((fabs(normal.y)>=fabs(normal.z))&&(fabs(normal.y)>=fabs(normal.x)))
 				{
 				j1 = (resultpoint.z - tr.A.z)*(tr.B.x - tr.A.x) - (resultpoint.x - tr.A.x)*(tr.B.z - tr.A.z);
 				j2 = (resultpoint.z - tr.B.z)*(tr.C.x - tr.B.x) - (resultpoint.x - tr.B.x)*(tr.C.z - tr.B.z);
@@ -198,7 +206,7 @@ bool triangleIntersect(vector &resultpoint,double &resultt, double &mint, const 
 				}
 				else
 				{
-					if((abs(normal.x)>=abs(normal.y))&&(abs(normal.x)>=abs(normal.z)))
+					if((fabs(normal.x)>=fabs(normal.y))&&(fabs(normal.x)>=fabs(normal.z)))
 					{
 					j1 = (resultpoint.z - tr.A.z)*(tr.B.y - tr.A.y) - (resultpoint.y - tr.A.y)*(tr.B.z - tr.A.z);
 					j2 = (resultpoint.z - tr.B.z)*(tr.C.y - tr.B.y) - (resultpoint.y - tr.B.y)*(tr.C.z - tr.B.z);
@@ -218,27 +226,42 @@ bool triangleIntersect(vector &resultpoint,double &resultt, double &mint, const 
 
 }
 
-bool lighttrace(const vector &point, vector &ray, int itri)
+bool lighttrace(const vector &point, vector &ray, int itri, bool &mirror, int &closesti)
 {
 	int i = 0;
 	vector hitpoint;
 	vector temp;
 	double t;
+	bool hitexists = false;
 	double min = 1;
+	closesti = -1;
 	
 	for (i = 0; i<Model.trianglesnum; i++)
 		{
 			if (i!=itri)
 			if (triangleIntersect(hitpoint,t,min,point,ray,Model.triangles[i],false))
 			{
-				return false;
+				hitexists = true;
+				closesti = i;
 			}
 		}
-	
-	return true;
+	if (hitexists)
+	{
+		if (Model.triangles[closesti].Color.g == -1.0)
+		{
+			mirror = true;
+		}
+		else 
+		{
+			mirror = false;
+		}
+		return false;
+	}
+		return true;
 }
 
-void raytrace( color* final, const vector &cam, vector &ray)
+
+void raytrace( color* final, const vector &cam, vector &ray, int it)
 {
 	
 	int i,k;
@@ -251,35 +274,66 @@ void raytrace( color* final, const vector &cam, vector &ray)
     k = 0;
 	vector hitpoint;
 	vector finalhitpoint;
+	vector temphitpoint;
 	bool hitexists = false;
 	double t;
 	double min = 9999999.9;
 	int itri = -1;
-    //while( 1 )
+	final->g = -1.0;
+	finalhitpoint.x = cam.x;
+	finalhitpoint.y = cam.y;
+	finalhitpoint.z = cam.z;
+    //while( final->g ==-1.0 )
     {
-        
-		final->g = 0.0;
+		min = 9999999.9;
+		hitexists = false;
+        itri = -1;
+		final->g = DEFAULTCOLOR;
 		for (i = 0; i<Model.trianglesnum; i++)
-		{
-			if (triangleIntersect(hitpoint,t,min,cam,ray,Model.triangles[i],false))
+		{if ((itri!=i)&&(it!=i))
+			if (triangleIntersect(hitpoint,t,min,finalhitpoint,ray,Model.triangles[i],false))
 			{
 				itri = i;
 				final->g = Model.triangles[i].Color.g;
 				hitexists = true;
-				finalhitpoint.x = hitpoint.x;
-				finalhitpoint.y = hitpoint.y;
-				finalhitpoint.z = hitpoint.z;
+				temphitpoint.x = hitpoint.x;
+				temphitpoint.y = hitpoint.y;
+				temphitpoint.z = hitpoint.z;
 			}
 		}
+		if (final->g == -1.0)
+		{
+			finalhitpoint.x = temphitpoint.x;
+			finalhitpoint.y = temphitpoint.y;
+			finalhitpoint.z = temphitpoint.z;
+			vector N = normal(Model.triangles[itri].A,Model.triangles[itri].B,Model.triangles[itri].C);
+			//normalize(N,1.0);
+			vector temp;
+			mirror(temp,ray,N);
+			ray.x = -temp.x;
+			ray.y = -temp.y;
+			ray.z = -temp.z;
+			raytrace(final,finalhitpoint,ray,itri);
+			return;
+		}
+		////
+	}{
+		////
         if(hitexists)
         {
+			finalhitpoint.x = temphitpoint.x;
+			finalhitpoint.y = temphitpoint.y;
+			finalhitpoint.z = temphitpoint.z;
             vector beam;
             color light;
-                            
+            bool mirror = false;  
+			//while (mirror)
+			{
 				light.g = 0.0;
 				subtract( beam, Model.lightspot, finalhitpoint );
-               
-				if (lighttrace(finalhitpoint, beam, itri)) // hit the lightspot
+                
+				int closesti;
+				if (lighttrace(finalhitpoint, beam, itri,mirror,closesti)) // hit the lightspot
 				{
 					vector temp1;
 					vector temp2;
@@ -292,20 +346,18 @@ void raytrace( color* final, const vector &cam, vector &ray)
 					double k1 = K1;
 					double k2 = K2;
 					double C0 = LIGHT;
-					double factor = /*scalarproduct(N,beam) sqrt(1-cosang*cosang)*/C0 * abs(cosang)/(k0+k1*d + k2*d*d);
-					//if (factor<0) factor = 0;
-                light.g = (factor);
-				if (light.g >0.5) 
-				{
-					int trololo = 0;
-				}
-                //final->g = 0.7;
-				final->g += light.g;
+					double factor = /*scalarproduct(N,beam) sqrt(1-cosang*cosang)*/C0 * sqrt(sqrt(fabs(cosang)))/(k0+k1*d + k2*d*d);
+					light.g = (factor);
+					final->g += light.g;
 				}
 				else
 				{
-					//final->g = 0.2;
+					if (mirror)
+					{
+
+					}
 				}
+			}
 		}
 		else{
 		int trololo =-1;}
@@ -358,14 +410,14 @@ void render(int width, int height)
                     ray.y = Model.cameratarget.y+side.y+up.y - Model.camera.y;
                     ray.z = Model.cameratarget.z+side.z+up.z - Model.camera.z;
 
-					raytrace( Color, Model.camera, ray);
+					raytrace( Color, Model.camera, ray, -1);
 			pictureArray[i][j] = (unsigned char)(Color->g * 255);
 			if ((((i*(j-1) +j)*100)%(goal*3)) == 0) cout << ".";
         }
 
 	//##########################################################
-			/*di = 197;
-            dj = 94;
+		/*	di = 259;
+            dj = 301;
                     vector side;
                     side.x =  mainvector.y;
                     side.y = -mainvector.x;
@@ -382,24 +434,57 @@ void render(int width, int height)
                     ray.y = Model.cameratarget.y+side.y+up.y - Model.camera.y;
                     ray.z = Model.cameratarget.z+side.z+up.z - Model.camera.z;
 
-					raytrace( Color, Model.camera, ray);*/
-
+					raytrace( Color, Model.camera, ray,-1);
+*/
 	//#######################################################
 }
 
-int main()
+int main(int argc, char *argv[])
 {
-	cout<<"opening file "<<modelfile<<"...";
-	openmodel(modelfile,&Model);
+	char mfile[30];
+	char ifile[30];
+	memset(mfile,0,30);
+	memset(ifile,0,30);
+	int i = 1;
+			
+	if (argc >=2)
+
+	{
+		while (i<argc-1)
+		{
+			if(strcmp(argv[i],paramstrm) == 0)
+			{
+				strncpy(mfile,argv[i+1],strlen(argv[i+1]));
+				i+=2;
+			}
+			else if (strcmp(argv[i],paramstri) ==0)
+			{
+				strncpy(ifile,argv[i+1],strlen(argv[i+1]));
+				i+=2;
+			}
+			else 
+			{
+				cout<<"Usage: -m <model_filename> -i <image_filename>"<<endl;
+				return 0;
+			}
+				
+		}
+	}
+	if (strcmp(mfile,"") == 0) strncpy(mfile,modelfile,strlen(modelfile));
+	if (strcmp(ifile,"") ==0) strncpy(ifile,pgmname,strlen(pgmname));
+	cout<<"opening file "<<mfile<<"...";
+	if (!openmodel(mfile,&Model)) return 0;
 	cout<<"done"<<endl;
 	
 	cout<<"raytracing...";
 	render(WIDTH,HEIGHT);
 	cout<<"done\n";
 
-	cout<<"saving file "<<pgmname<<"...";
-	savepgm(pgmname,P_FORMAT,WIDTH,HEIGHT,COLORS);
+	cout<<"saving file "<<ifile<<"...";
+	if (!savepgm(ifile,P_FORMAT,WIDTH,HEIGHT,COLORS)) return 0;
 	cout<<"done"<<endl;
-	//openpgm();
+	#ifdef WIN32
+	openpgm();
+	#endif
 	return 0;
 }
