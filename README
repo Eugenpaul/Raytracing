@@ -1,0 +1,7 @@
+model file:
+
+light 	x y z
+camera 	x y z
+target 	x y z
+material 	material_name reflect_factor scatter_factor color
+triangle 	material_name Ax Ay Az Bx By Bz Cx Cy Cz

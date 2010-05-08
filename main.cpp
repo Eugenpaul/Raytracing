@@ -18,10 +18,12 @@ using namespace std;
 #define HEIGHT 480
 #define COLORS 255
 #define DEFAULTCOLOR 0.0
+#define MATERIALNAMESIZE 30
+#define MATERIALSNUM 5
 #define K0 0.1
-#define K1 0.2
-#define K2 0.4
-#define LIGHT 255
+#define K1 0.3
+#define K2 0.5
+#define LIGHT 500
 const char* mode = "P";
 #define P_FORMAT 2
 
@@ -31,19 +33,39 @@ const char *modelfile = "./model.model";
 const char *paramstrm = "-m";
 const char *paramstri = "-i";
 
+const char *lightstring = "light";
+const char *camerastring = "camera";
+const char *targetstring = "target";
+const char *materialstring = "material";
+const char *reflectstring = "reflect";
+const char *scatterstring = "scatter";
+const char *colorstring = "color";
+const char *trianglestring = "triangle";
+
 
 typedef struct colorstruct
 {
 	double g;
 }color;
 
+
+typedef struct materialstruct
+{
+	char name[MATERIALNAMESIZE];
+	color Color;
+	double reflectfactor;
+	double scatterfactor;
+}Material;
+
 typedef struct trianglestruct
 {
 	vector A;
 	vector B;
 	vector C;
-	color Color;
+	Material material;
 }triangle;
+
+
 
 typedef struct modelstruct
 {
@@ -55,6 +77,7 @@ typedef struct modelstruct
 
 }model;
 
+Material materials[MATERIALSNUM];
 model Model;
 
 unsigned char pictureArray[WIDTH][HEIGHT];
@@ -107,36 +130,74 @@ void openpgm()
 
 int openmodel(const char *filename, model *ModelPoint)
 {
-	int n = 0;
+	int n = 0, i = 0;
+	int materialnum = 0;
+	char temp[30];
 	ifstream in(filename);
 	if (!in)
 	{
 		cout <<"Cannot open file "<<filename<<"\n";
 		return 0;
 	}
-    in >> ModelPoint->lightspot.x;
-	in >> ModelPoint->lightspot.y;
-	in >> ModelPoint->lightspot.z;
-	in >> ModelPoint->camera.x;
-	in >> ModelPoint->camera.y;
-	in >> ModelPoint->camera.z;
-	in >> ModelPoint->cameratarget.x;
-	in >> ModelPoint->cameratarget.y;
-	in >> ModelPoint->cameratarget.z;
-	in >> ModelPoint->trianglesnum;
-	int i = 0;
-	for (i = 0; i<ModelPoint->trianglesnum; i++)
+	
+	bool end = false;
+	ModelPoint->trianglesnum = 0;
+	while (!end)
 	{
-		in >> ModelPoint->triangles[i].A.x;
-		in >> ModelPoint->triangles[i].A.y;
-		in >> ModelPoint->triangles[i].A.z;
-		in >> ModelPoint->triangles[i].B.x;
-		in >> ModelPoint->triangles[i].B.y;
-		in >> ModelPoint->triangles[i].B.z;
-		in >> ModelPoint->triangles[i].C.x;
-		in >> ModelPoint->triangles[i].C.y;
-		in >> ModelPoint->triangles[i].C.z;
-		in >> ModelPoint->triangles[i].Color.g;
+	in >> temp;
+	if (strcmp(temp,trianglestring)==0)
+	{
+		char m[30];
+		in >> m;
+		for (i = 0; i < materialnum; i++)
+		{
+			if (strcmp(m,materials[i].name) ==0)
+			{
+				ModelPoint->triangles[ModelPoint->trianglesnum].material = materials[i];
+			}
+		}
+		in >> ModelPoint->triangles[ModelPoint->trianglesnum].A.x;
+		in >> ModelPoint->triangles[ModelPoint->trianglesnum].A.y;
+		in >> ModelPoint->triangles[ModelPoint->trianglesnum].A.z;
+		in >> ModelPoint->triangles[ModelPoint->trianglesnum].B.x;
+		in >> ModelPoint->triangles[ModelPoint->trianglesnum].B.y;
+		in >> ModelPoint->triangles[ModelPoint->trianglesnum].B.z;
+		in >> ModelPoint->triangles[ModelPoint->trianglesnum].C.x;
+		in >> ModelPoint->triangles[ModelPoint->trianglesnum].C.y;
+		in >> ModelPoint->triangles[ModelPoint->trianglesnum].C.z;
+		ModelPoint->trianglesnum ++;
+	}
+	else if(strcmp(temp,materialstring)==0)
+	{
+		in>>materials[materialnum].name;
+		in>>materials[materialnum].reflectfactor;
+		in>>materials[materialnum].scatterfactor;
+		in>>materials[materialnum].Color.g;
+		materialnum++;
+	}
+	else if (strcmp(temp,lightstring)==0)
+	{
+		in >> ModelPoint->lightspot.x;
+		in >> ModelPoint->lightspot.y;
+		in >> ModelPoint->lightspot.z;
+	}
+	else if(strcmp(temp,camerastring)==0)
+	{
+		in >> ModelPoint->camera.x;
+		in >> ModelPoint->camera.y;
+		in >> ModelPoint->camera.z;
+	}
+	else if(strcmp(temp,targetstring)==0)
+	{
+		in >> ModelPoint->cameratarget.x;
+		in >> ModelPoint->cameratarget.y;
+		in >> ModelPoint->cameratarget.z;
+	}
+	else 
+	{
+		end = true;
+	}
+	
 	}
 	in.close();
 	return 1;
@@ -226,7 +287,7 @@ bool triangleIntersect(vector &resultpoint,double &resultt, double &mint, const 
 
 }
 
-bool lighttrace(const vector &point, vector &ray, int itri, bool &mirror, int &closesti)
+bool lighttrace(const vector &point, vector &ray, int itri, int &closesti)
 {
 	int i = 0;
 	vector hitpoint;
@@ -245,9 +306,9 @@ bool lighttrace(const vector &point, vector &ray, int itri, bool &mirror, int &c
 				closesti = i;
 			}
 		}
-	if (hitexists)
+	/*if (hitexists)
 	{
-		if (Model.triangles[closesti].Color.g == -1.0)
+		if (Model.triangles[closesti].material.reflectfactor == 1.0)
 		{
 			mirror = true;
 		}
@@ -256,21 +317,16 @@ bool lighttrace(const vector &point, vector &ray, int itri, bool &mirror, int &c
 			mirror = false;
 		}
 		return false;
-	}
-		return true;
+	}*/
+		if (hitexists) return false;
+		else return true;
 }
 
 
-void raytrace( color* final, const vector &cam, vector &ray, int it)
+void raytrace( color* final, const vector &cam, vector &ray, int it, int depth)
 {
 	
 	int i,k;
-   
-    
-    vector hit;
-    double p;
-        
-    p = 0.0;
     k = 0;
 	vector hitpoint;
 	vector finalhitpoint;
@@ -283,25 +339,25 @@ void raytrace( color* final, const vector &cam, vector &ray, int it)
 	finalhitpoint.x = cam.x;
 	finalhitpoint.y = cam.y;
 	finalhitpoint.z = cam.z;
-    //while( final->g ==-1.0 )
     {
 		min = 9999999.9;
 		hitexists = false;
         itri = -1;
 		final->g = DEFAULTCOLOR;
 		for (i = 0; i<Model.trianglesnum; i++)
-		{if ((itri!=i)&&(it!=i))
+		{	if ((itri!=i)&&(it!=i))
 			if (triangleIntersect(hitpoint,t,min,finalhitpoint,ray,Model.triangles[i],false))
 			{
 				itri = i;
-				final->g = Model.triangles[i].Color.g;
+				final->g = Model.triangles[i].material.Color.g;
 				hitexists = true;
 				temphitpoint.x = hitpoint.x;
 				temphitpoint.y = hitpoint.y;
 				temphitpoint.z = hitpoint.z;
 			}
 		}
-		if (final->g == -1.0)
+		if (hitexists)
+		if  (1)//(Model.triangles[itri].material.reflectfactor > 0.0)
 		{
 			finalhitpoint.x = temphitpoint.x;
 			finalhitpoint.y = temphitpoint.y;
@@ -310,30 +366,37 @@ void raytrace( color* final, const vector &cam, vector &ray, int it)
 			//normalize(N,1.0);
 			vector temp;
 			mirror(temp,ray,N);
-			ray.x = -temp.x;
-			ray.y = -temp.y;
-			ray.z = -temp.z;
-			raytrace(final,finalhitpoint,ray,itri);
-			return;
-		}
-		////
-	}{
-		////
-        if(hitexists)
-        {
+			if (1)//(rand()%100 > (1-Model.triangles[itri].material.scatterfactor)*100)
+			{
+				double randomk = 1500;
+				int kk = Model.triangles[itri].material.scatterfactor*1000;
+				if (kk!=0)
+				{
+					ray.x = -temp.x*(randomk+rand()%kk)/(randomk+rand()%kk);
+					ray.y = -temp.y*(randomk+rand()%kk)/(randomk+rand()%kk);
+					ray.z = -temp.z*(randomk+rand()%kk)/(randomk+rand()%kk);
+				}
+				else
+				{
+					ray.x = -temp.x;
+					ray.y = -temp.y;
+					ray.z = -temp.z;
+				
+				}
+			}
 			finalhitpoint.x = temphitpoint.x;
 			finalhitpoint.y = temphitpoint.y;
 			finalhitpoint.z = temphitpoint.z;
             vector beam;
             color light;
             bool mirror = false;  
-			//while (mirror)
+			
 			{
 				light.g = 0.0;
 				subtract( beam, Model.lightspot, finalhitpoint );
                 
 				int closesti;
-				if (lighttrace(finalhitpoint, beam, itri,mirror,closesti)) // hit the lightspot
+				if (lighttrace(finalhitpoint, beam, itri,closesti)) // hit the lightspot
 				{
 					vector temp1;
 					vector temp2;
@@ -346,21 +409,111 @@ void raytrace( color* final, const vector &cam, vector &ray, int it)
 					double k1 = K1;
 					double k2 = K2;
 					double C0 = LIGHT;
-					double factor = /*scalarproduct(N,beam) sqrt(1-cosang*cosang)*/C0 * sqrt(sqrt(fabs(cosang)))/(k0+k1*d + k2*d*d);
+					if (1)//(rand()%100 > (1-Model.triangles[itri].material.scatterfactor)*100)
+					{
+					double randomk = 1500;
+					int kk = Model.triangles[itri].material.scatterfactor*10000;
+					if (kk!=0)
+					{
+					//beam.x *= (randomk+rand()%kk)/(randomk+rand()%kk);
+					//beam.y *= (randomk+rand()%kk)/(randomk+rand()%kk);
+					//beam.z *= (randomk+rand()%kk)/(randomk+rand()%kk);
+					cosang *= (randomk+rand()%kk)/(randomk+rand()%kk);
+					
+					}
+					}
+					double factor = C0 * sqrt(sqrt(fabs(cosang)))/(k0+k1*d + k2*d*d);
 					light.g = (factor);
-					final->g += light.g;
+					//final->g += light.g;
+				}
+			}
+			final->g = 0;
+			color tempc;
+			tempc.g = final->g;
+			if (depth<10)
+			{
+			raytrace(&tempc,finalhitpoint,ray,itri,depth+1);
+			}
+
+			final->g+= Model.triangles[itri].material.reflectfactor*tempc.g + light.g;
+			if (final->g>1) final->g = 1;
+			return;
+		}
+		////
+	}{
+		////
+        if(hitexists)
+        {
+			finalhitpoint.x = temphitpoint.x;
+			finalhitpoint.y = temphitpoint.y;
+			finalhitpoint.z = temphitpoint.z;
+            vector beam;
+            color light;
+			{
+				light.g = 0.0;
+				subtract( beam, Model.lightspot, finalhitpoint );
+                
+				int closesti;
+				if (lighttrace(finalhitpoint, beam, itri,closesti)) // hit the lightspot
+				{
+					vector temp1;
+					vector temp2;
+					vector temp3;
+					vector temp4;
+					vector N = cross(temp3,subtract(temp1,Model.triangles[itri].B,Model.triangles[itri].A),subtract(temp2,Model.triangles[itri].C,Model.triangles[itri].B));
+				
+				
+			
+					
+					double cosang = scalarproduct(beam,N)/(sqrt(scalarproduct(beam,beam))*sqrt(scalarproduct(N,N)));
+					//random  for scatter		
+					if (1)//(rand()%100 > (1-Model.triangles[itri].material.scatterfactor)*100)
+					{
+					double randomk = 1500;
+					int kk = Model.triangles[itri].material.scatterfactor*10000;
+					if (kk!=0)
+					{
+					//beam.x *= (randomk+rand()%kk)/(randomk+rand()%kk);
+					//beam.y *= (randomk+rand()%kk)/(randomk+rand()%kk);
+					//beam.z *= (randomk+rand()%kk)/(randomk+rand()%kk);
+					cosang *= (randomk+rand()%kk)/(randomk+rand()%kk);
+					
+					}
+					}
+			
+					
+					double d = sqrt(beam.x*beam.x + beam.y*beam.y + beam.z*beam.z);
+					double k0 = K0;
+					double k1 = K1;
+					double k2 = K2;
+					double C0 = LIGHT;
+					double factor = C0 * sqrt(sqrt(fabs(cosang)))/(k0+k1*d + k2*d*d);
+					light.g = (factor);
+					final->g += (light.g);///((depth+1)*3);
 				}
 				else
 				{
-					if (mirror)
+					/*if (mirror)
 					{
-
-					}
+						vector temp1;
+						vector temp2;
+						vector temp3;
+						vector temp4;
+						vector N = cross(temp3,subtract(temp1,Model.triangles[itri].B,Model.triangles[itri].A),subtract(temp2,Model.triangles[itri].C,Model.triangles[itri].B));
+						double cosang = scalarproduct(beam,N)/(sqrt(scalarproduct(beam,beam))*sqrt(scalarproduct(N,N)));
+						double d = sqrt(beam.x*beam.x + beam.y*beam.y + beam.z*beam.z);
+						double k0 = K0;
+						double k1 = K1;
+						double k2 = K2;
+						double C0 = LIGHT;
+						double factor = C0 * sqrt(sqrt(fabs(cosang)))/(k0+k1*d + k2*d*d);
+						light.g = (factor);
+						final->g += light.g/((depth+1)*5);
+						
+					}*/
 				}
 			}
 		}
-		else{
-		int trololo =-1;}
 }
     if( final->g>1.0 ) final->g = 1.0;
     if( final->g<0.0 ) final->g = 0.0;
@@ -410,14 +563,14 @@ void render(int width, int height)
                     ray.y = Model.cameratarget.y+side.y+up.y - Model.camera.y;
                     ray.z = Model.cameratarget.z+side.z+up.z - Model.camera.z;
 
-					raytrace( Color, Model.camera, ray, -1);
+					raytrace( Color, Model.camera, ray, -1, 0);
 			pictureArray[i][j] = (unsigned char)(Color->g * 255);
 			if ((((i*(j-1) +j)*100)%(goal*3)) == 0) cout << ".";
         }
 
 	//##########################################################
-		/*	di = 259;
-            dj = 301;
+	/*		di = 225;
+            dj = 225;
                     vector side;
                     side.x =  mainvector.y;
                     side.y = -mainvector.x;
