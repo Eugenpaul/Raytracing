@@ -1,15 +1,20 @@
-light 	35.0 	30.0 	50.0
-camera 	300.0 	200.0 	150.0
-target 	20.0 	20.0 	50.0
-material default 0.05 0.3 0.0
-material mirror  0.6 0.05 0.0 
+light 	57.0 	30.0 	60.0
+camera 	150.0 	200.0 	130.0
+target 	20.0 	20.0 	10.0
+material default 0.2 0.3 0.0
+material mirror  0.5 0.05 0.0 
+material perfectmirror 0.9 0.0 0.0
 
-triangle mirror  0.1 0.0 0.0 	   0.1 0.0 200.0    300.0 0.0 0.0
-triangle mirror  0.1 0.0 0.0	   110.1 200.0 0.0  0.1 0.0 200.0	 
-triangle default 0.1 0.0 0.0	   0.1 200.0 0.0    300.0 0.0 0.0	 
-triangle mirror  300.0 0.0 200.0   300.0 0.0 0.0    0.1 0.0 200.0	 
-triangle mirror  110.1 200.0 200.0 0.1 0.0 200.0    110.1 200.0 0.0	 
-triangle default 300.0 200.0 0.0   300.0 0.0 0.0    0.1 200.0 0.0	  
+sphere   perfectmirror 10.0 	30.0 20.0 10.0
+sphere 	 mirror		20.0	30.0 60.0 20.0
+sphere   mirror		12.0 	90.0 12.0 37.0
+sphere 	 mirror 	12.0 	30.0 60.0 52.0
+triangle mirror  0.0 0.0 0.0 	   0.0 0.0 200.0    300.0 0.0 0.0
+triangle mirror  0.0 0.0 0.0	   0.0 200.0 0.0    0.0 0.0 200.0	 
+triangle default 0.0 0.0 0.0	   0.0 200.0 0.0    300.0 0.0 0.0	 
+triangle mirror  300.0 0.0 200.0   300.0 0.0 0.0    0.0 0.0 200.0	 
+triangle mirror  0.0 200.0 200.0   0.0 0.0 200.0    0.0 200.0 0.0	 
+triangle default 300.0 200.0 0.0   300.0 0.0 0.0    0.0 200.0 0.0	  
 triangle default 55.0 25.0 25.0	   55.0 25.0 0.0    55.0 0.0 25.0	 
 triangle default 55.0 0.0 0.0  	   55.0 25.0 0.0    55.0 0.0 25.0	 
 triangle default 70.0 25.0 25.0	   70.0 25.0 0.0    70.0 0.0 25.0	
@@ -17,4 +22,13 @@ triangle default 70.0 0.0 0.0	   70.0 25.0 0.0    70.0 0.0 25.0
 triangle default 70.0 25.0 25.0	   55.0 25.0 25.0    70.0 25.0 0.0	
 triangle default 70.0 25.0 0.0	   55.0 25.0 25.0    55.0 25.0 0.0	
 triangle default 70.0 25.0 25.0	   55.0 25.0 25.0    70.0 0.0 25.0	
-triangle default 70.0 0.0 25.0	   55.0 25.0 25.0    55.0 0.0 25.0	
+triangle default 70.0 0.0 25.0	   55.0 25.0 25.0    55.0 0.0 25.0
+	
+triangle default 85.0 25.0 25.0	   85.0 25.0 0.0    85.0 0.0 25.0	 
+triangle default 85.0 0.0 0.0  	   85.0 25.0 0.0    85.0 0.0 25.0	 
+triangle default 100.0 25.0 25.0   100.0 25.0 0.0    100.0 0.0 25.0	
+triangle default 100.0 0.0 0.0	   100.0 25.0 0.0    100.0 0.0 25.0	
+triangle default 100.0 25.0 25.0   85.0 25.0 25.0    100.0 25.0 0.0	
+triangle default 100.0 25.0 0.0	   85.0 25.0 25.0    85.0 25.0 0.0	
+triangle default 100.0 25.0 25.0   85.0 25.0 25.0    100.0 0.0 25.0	
+triangle default 100.0 0.0 25.0	   85.0 25.0 25.0    85.0 0.0 25.0

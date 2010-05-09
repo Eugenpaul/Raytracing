@@ -14,12 +14,13 @@
 
 using namespace std;
 
-#define WIDTH 640
-#define HEIGHT 480
+#define WIDTH 1024
+#define HEIGHT 600
 #define COLORS 255
 #define DEFAULTCOLOR 0.0
 #define MATERIALNAMESIZE 30
 #define MATERIALSNUM 5
+#define MAXDEPTH 3
 #define K0 0.1
 #define K1 0.3
 #define K2 0.5
@@ -41,6 +42,7 @@ const char *reflectstring = "reflect";
 const char *scatterstring = "scatter";
 const char *colorstring = "color";
 const char *trianglestring = "triangle";
+const char *spherestring = "sphere";
 
 
 typedef struct colorstruct
@@ -65,7 +67,12 @@ typedef struct trianglestruct
 	Material material;
 }triangle;
 
-
+typedef struct sphere
+{
+	vector C;
+	double R;
+	Material material;
+}sphere;
 
 typedef struct modelstruct
 {
@@ -73,7 +80,9 @@ typedef struct modelstruct
 	vector camera;
 	vector cameratarget;
 	int trianglesnum;
-	triangle triangles[20];
+	triangle triangles[100];
+	int spheresnum;
+	sphere spheres[10];
 
 }model;
 
@@ -142,6 +151,7 @@ int openmodel(const char *filename, model *ModelPoint)
 	
 	bool end = false;
 	ModelPoint->trianglesnum = 0;
+	ModelPoint->spheresnum = 0;
 	while (!end)
 	{
 	in >> temp;
@@ -166,6 +176,23 @@ int openmodel(const char *filename, model *ModelPoint)
 		in >> ModelPoint->triangles[ModelPoint->trianglesnum].C.y;
 		in >> ModelPoint->triangles[ModelPoint->trianglesnum].C.z;
 		ModelPoint->trianglesnum ++;
+	}
+	else if (strcmp(temp,spherestring) == 0)
+	{
+		char m[30];
+		in >>m;
+		for (i = 0; i < materialnum; i++)
+		{
+			if (strcmp(m,materials[i].name) == 0)
+			{
+			ModelPoint->spheres[ModelPoint->spheresnum].material = materials[i];
+			}
+		}
+		in >> ModelPoint->spheres[ModelPoint->spheresnum].R;
+		in >> ModelPoint->spheres[ModelPoint->spheresnum].C.x;
+		in >> ModelPoint->spheres[ModelPoint->spheresnum].C.y;
+		in >> ModelPoint->spheres[ModelPoint->spheresnum].C.z;
+		ModelPoint->spheresnum ++;
 	}
 	else if(strcmp(temp,materialstring)==0)
 	{
@@ -287,7 +314,47 @@ bool triangleIntersect(vector &resultpoint,double &resultt, double &mint, const 
 
 }
 
-bool lighttrace(const vector &point, vector &ray, int itri, int &closesti)
+bool sphereIntersect(double &resultt, double &mint, const vector &camera, vector &ray,const sphere &sph)
+{
+	double det,b;
+	vector camcent;
+	subtract(camcent,camera,sph.C);
+	b = -scalarproduct(camcent,ray);
+	det = b*b - scalarproduct(camcent,camcent)*scalarproduct(ray,ray) + sph.R*sph.R*scalarproduct(ray,ray);
+	if (det<0)
+	{
+		return false;
+	}
+	det = sqrt(det);
+	double temp1, temp2;
+	temp1 = (b + det)/scalarproduct(ray,ray);
+	if (temp1 < 0) return false;
+	else
+	{
+		double temp2 = (b - det)/scalarproduct(ray,ray);
+		if (temp2>0)
+		{
+			if ((temp2*temp2*(ray.x*ray.x + ray.y*ray.y + ray.z*ray.z) > 0.01))
+			temp1 = temp2;
+		}
+		if (temp1<mint)
+		{
+			//mint = temp1;
+			resultt = temp1;
+			if ((resultt*resultt*(ray.x*ray.x + ray.y*ray.y + ray.z*ray.z) > 0.01))
+			{
+				mint = temp1;
+				return true;
+			}
+			else return false;
+		}
+		else return false;
+	}
+	
+	
+}
+
+bool lighttrace(const vector &point, vector &ray, int itri, int &closesti, int objind)//objind sph = 0, tr = 1
 {
 	int i = 0;
 	vector hitpoint;
@@ -296,13 +363,28 @@ bool lighttrace(const vector &point, vector &ray, int itri, int &closesti)
 	bool hitexists = false;
 	double min = 1;
 	closesti = -1;
-	
+	bool hittr = false;
+	bool hitsph = false;
+	for (i = 0; i<Model.spheresnum; i++)
+	{
+		if (/*(i!=itri)||(objind!=0)*/1)
+			if (sphereIntersect(t,min,point,ray,Model.spheres[i]))
+			{
+				hitexists = true;
+				hitsph = true;
+				hittr = false;
+				closesti = i;
+			}
+	}
+
 	for (i = 0; i<Model.trianglesnum; i++)
 		{
-			if (i!=itri)
+			if ((i!=itri)||(objind!=1))
 			if (triangleIntersect(hitpoint,t,min,point,ray,Model.triangles[i],false))
 			{
 				hitexists = true;
+				hitsph = false;
+				hittr = true;
 				closesti = i;
 			}
 		}
@@ -323,7 +405,18 @@ bool lighttrace(const vector &point, vector &ray, int itri, int &closesti)
 }
 
 
-void raytrace( color* final, const vector &cam, vector &ray, int it, int depth)
+/*bool lightIntersect(const vector &cam,vector &ray, double R)
+{
+	vector temp;
+	add(temp,cam,ray);
+	if ((temp.x - Model.lightspot.x)*(temp.x - Model.lightspot.x)+
+		(temp.y - Model.lightspot.y)*(temp.y - Model.lightspot.y)+
+		(temp.z - Model.lightspot.z)*(temp.z - Model.lightspot.z) <=R*R)
+		return true;
+	else return false;
+}*/
+
+void raytrace( color* final, const vector &cam, vector &ray, int it, int depth, int objind)
 {
 	
 	int i,k;
@@ -344,11 +437,31 @@ void raytrace( color* final, const vector &cam, vector &ray, int it, int depth)
 		hitexists = false;
         itri = -1;
 		final->g = DEFAULTCOLOR;
+		bool hittr = false;
+		bool hitsph = false;
+		for (i = 0; i<Model.spheresnum; i++)
+		{
+			if ((i!=itri)||(objind!=0))
+				if (sphereIntersect(t,min,finalhitpoint,ray,Model.spheres[i]))
+				{
+					hitexists = true;
+					hitsph = true;
+					hittr = false;
+					itri = i;
+					final->g = Model.spheres[i].material.Color.g;
+					temphitpoint.x = finalhitpoint.x + ray.x*t;
+					temphitpoint.y = finalhitpoint.y + ray.y*t;
+					temphitpoint.z = finalhitpoint.z + ray.z*t;
+				}
+		}
+
 		for (i = 0; i<Model.trianglesnum; i++)
-		{	if ((itri!=i)&&(it!=i))
+		{	if (((itri!=i)&&(it!=i))||objind!=1)
 			if (triangleIntersect(hitpoint,t,min,finalhitpoint,ray,Model.triangles[i],false))
 			{
 				itri = i;
+				hitsph = false;
+				hittr = true;
 				final->g = Model.triangles[i].material.Color.g;
 				hitexists = true;
 				temphitpoint.x = hitpoint.x;
@@ -362,14 +475,26 @@ void raytrace( color* final, const vector &cam, vector &ray, int it, int depth)
 			finalhitpoint.x = temphitpoint.x;
 			finalhitpoint.y = temphitpoint.y;
 			finalhitpoint.z = temphitpoint.z;
-			vector N = normal(Model.triangles[itri].A,Model.triangles[itri].B,Model.triangles[itri].C);
+			vector N;
+			if (hittr)
+			N = normal(Model.triangles[itri].A,Model.triangles[itri].B,Model.triangles[itri].C);
+			else if (hitsph)
+			{
+			subtract(N,finalhitpoint,Model.spheres[itri].C);
+			}
 			//normalize(N,1.0);
 			vector temp;
 			mirror(temp,ray,N);
 			if (1)//(rand()%100 > (1-Model.triangles[itri].material.scatterfactor)*100)
 			{
 				double randomk = 1500;
-				int kk = Model.triangles[itri].material.scatterfactor*1000;
+				int kk;
+				if (hittr)
+				kk = Model.triangles[itri].material.scatterfactor*1000;
+				else if (hitsph)
+				{
+					kk = Model.spheres[itri].material.scatterfactor*1000;
+				}
 				if (kk!=0)
 				{
 					ray.x = -temp.x*(randomk+rand()%kk)/(randomk+rand()%kk);
@@ -396,7 +521,9 @@ void raytrace( color* final, const vector &cam, vector &ray, int it, int depth)
 				subtract( beam, Model.lightspot, finalhitpoint );
                 
 				int closesti;
-				if (lighttrace(finalhitpoint, beam, itri,closesti)) // hit the lightspot
+				if (hittr)
+				{
+				if (lighttrace(finalhitpoint, beam, itri,closesti,1)) // hit the lightspot
 				{
 					vector temp1;
 					vector temp2;
@@ -404,6 +531,7 @@ void raytrace( color* final, const vector &cam, vector &ray, int it, int depth)
 					vector temp4;
 					vector N = cross(temp3,subtract(temp1,Model.triangles[itri].B,Model.triangles[itri].A),subtract(temp2,Model.triangles[itri].C,Model.triangles[itri].B));
 					double cosang = scalarproduct(beam,N)/(sqrt(scalarproduct(beam,beam))*sqrt(scalarproduct(N,N)));
+					//if (cosang<-0.51) cosang = 1 + cosang;
 					double d = sqrt(beam.x*beam.x + beam.y*beam.y + beam.z*beam.z);
 					double k0 = K0;
 					double k1 = K1;
@@ -426,16 +554,57 @@ void raytrace( color* final, const vector &cam, vector &ray, int it, int depth)
 					light.g = (factor);
 					//final->g += light.g;
 				}
+				}
+				else if (hitsph)
+				{
+					if (lighttrace(finalhitpoint, beam, itri,closesti,0)) // hit the lightspot
+					{
+					vector temp1;
+					vector temp2;
+					vector temp3;
+					vector temp4;
+					vector N;
+					subtract(N,finalhitpoint,Model.spheres[itri].C);
+					double cosang = scalarproduct(beam,N)/(sqrt(scalarproduct(beam,beam))*sqrt(scalarproduct(N,N)));
+					//if (cosang< -0.51) cosang = 1+cosang; 
+					double d = sqrt(beam.x*beam.x + beam.y*beam.y + beam.z*beam.z);
+					double k0 = K0;
+					double k1 = K1;
+					double k2 = K2;
+					double C0 = LIGHT;
+					if (1)//(rand()%100 > (1-Model.triangles[itri].material.scatterfactor)*100)
+					{
+					double randomk = 1500;
+					int kk = Model.spheres[itri].material.scatterfactor*10000;
+					if (kk!=0)
+					{
+					//beam.x *= (randomk+rand()%kk)/(randomk+rand()%kk);
+					//beam.y *= (randomk+rand()%kk)/(randomk+rand()%kk);
+					//beam.z *= (randomk+rand()%kk)/(randomk+rand()%kk);
+					cosang *= (randomk+rand()%kk)/(randomk+rand()%kk);
+					
+					}
+					}
+					double factor = C0 * sqrt(sqrt(fabs(cosang)))/(k0+k1*d + k2*d*d);
+					light.g = (factor);
+					//final->g += light.g;
+					}
+				}
 			}
 			final->g = 0;
 			color tempc;
 			tempc.g = final->g;
-			if (depth<10)
+			if (depth<MAXDEPTH)
 			{
-			raytrace(&tempc,finalhitpoint,ray,itri,depth+1);
+				if (hitsph)
+				raytrace(&tempc,finalhitpoint,ray,itri,depth+1,0);
+				else if (hittr)
+				raytrace(&tempc,finalhitpoint,ray,itri,depth+1,1);
 			}
-
-			final->g+= Model.triangles[itri].material.reflectfactor*tempc.g + light.g;
+			if (hitsph)
+			final->g+= Model.spheres[itri].material.reflectfactor*tempc.g + light.g*(1 - Model.spheres[itri].material.reflectfactor);
+			else if (hittr)
+				final->g+= Model.triangles[itri].material.reflectfactor*tempc.g + light.g;
 			if (final->g>1) final->g = 1;
 			return;
 		}
@@ -454,7 +623,7 @@ void raytrace( color* final, const vector &cam, vector &ray, int it, int depth)
 				subtract( beam, Model.lightspot, finalhitpoint );
                 
 				int closesti;
-				if (lighttrace(finalhitpoint, beam, itri,closesti)) // hit the lightspot
+				if (lighttrace(finalhitpoint, beam, itri,closesti,0)) // hit the lightspot
 				{
 					vector temp1;
 					vector temp2;
@@ -466,6 +635,7 @@ void raytrace( color* final, const vector &cam, vector &ray, int it, int depth)
 			
 					
 					double cosang = scalarproduct(beam,N)/(sqrt(scalarproduct(beam,beam))*sqrt(scalarproduct(N,N)));
+					//if (cosang<-0.51) cosang = 1 + cosang;
 					//random  for scatter		
 					if (1)//(rand()%100 > (1-Model.triangles[itri].material.scatterfactor)*100)
 					{
@@ -563,14 +733,14 @@ void render(int width, int height)
                     ray.y = Model.cameratarget.y+side.y+up.y - Model.camera.y;
                     ray.z = Model.cameratarget.z+side.z+up.z - Model.camera.z;
 
-					raytrace( Color, Model.camera, ray, -1, 0);
+					raytrace( Color, Model.camera, ray, -1, 0, -1);
 			pictureArray[i][j] = (unsigned char)(Color->g * 255);
 			if ((((i*(j-1) +j)*100)%(goal*3)) == 0) cout << ".";
         }
 
 	//##########################################################
-	/*		di = 225;
-            dj = 225;
+/*			di = 453;
+            dj = 289;
                     vector side;
                     side.x =  mainvector.y;
                     side.y = -mainvector.x;
@@ -587,7 +757,7 @@ void render(int width, int height)
                     ray.y = Model.cameratarget.y+side.y+up.y - Model.camera.y;
                     ray.z = Model.cameratarget.z+side.z+up.z - Model.camera.z;
 
-					raytrace( Color, Model.camera, ray,-1);
+					raytrace( Color, Model.camera, ray,-1,0,-1);
 */
 	//#######################################################
 }
