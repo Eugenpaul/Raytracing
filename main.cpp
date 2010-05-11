@@ -1,3 +1,4 @@
+#pragma once
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -5,7 +6,14 @@
 #include <memory.h>
 #include <fstream>
 #include <iostream>
+#ifndef STRUCTURE_H
+#include "structure.h"
+#define STRUCTURE_H
+#endif
 #include "vectormath.h"
+#include "io.h"
+#include "tracing.h"
+
 
 #ifdef WIN32
 #include <windows.h>
@@ -14,115 +22,12 @@
 
 using namespace std;
 
-#define WIDTH 1024
-#define HEIGHT 600
-#define COLORS 255
-#define DEFAULTCOLOR 0.0
-#define MATERIALNAMESIZE 30
-#define MATERIALSNUM 5
-#define MAXDEPTH 3
-#define K0 0.1
-#define K1 0.3
-#define K2 0.5
-#define LIGHT 500
-const char* mode = "P";
-#define P_FORMAT 2
 
 
-const char *pgmname = "./img.pgm";
-const char *modelfile = "./model.model";
-const char *paramstrm = "-m";
-const char *paramstri = "-i";
-
-const char *lightstring = "light";
-const char *camerastring = "camera";
-const char *targetstring = "target";
-const char *materialstring = "material";
-const char *reflectstring = "reflect";
-const char *scatterstring = "scatter";
-const char *colorstring = "color";
-const char *trianglestring = "triangle";
-const char *spherestring = "sphere";
-
-
-typedef struct colorstruct
-{
-	double g;
-}color;
-
-
-typedef struct materialstruct
-{
-	char name[MATERIALNAMESIZE];
-	color Color;
-	double reflectfactor;
-	double scatterfactor;
-}Material;
-
-typedef struct trianglestruct
-{
-	vector A;
-	vector B;
-	vector C;
-	Material material;
-}triangle;
-
-typedef struct sphere
-{
-	vector C;
-	double R;
-	Material material;
-}sphere;
-
-typedef struct modelstruct
-{
-	vector lightspot;
-	vector camera;
-	vector cameratarget;
-	int trianglesnum;
-	triangle triangles[100];
-	int spheresnum;
-	sphere spheres[10];
-
-}model;
-
-Material materials[MATERIALSNUM];
-model Model;
-
-unsigned char pictureArray[WIDTH][HEIGHT];
-
-
-
-
-int savepgm(const char *filename, int format, int width, int height, int maximum)
-{
-	ofstream out(filename);
-	if (!out)
-	{
-		cout << "Cannot open file "<<filename<<"\n";
-		return 0;
-	}
-	out << mode << format << endl;
-	out << width << " " << height << endl;
-	out << maximum << endl;
-	int i = 0, j = 0;
-	for(i=0; i<height; i++)
-    {
-		for (j = 0; j<width - 1; j++)
-		{
-			out << (int)pictureArray[j][i] << " ";
-			//out << rand()%maximum << " ";
-		}
-		out << (int)pictureArray[j][i]<<endl;
-		//out << rand()%maximum << endl;
-	}
-	out.close();
-	return 1;
-}
 #ifdef WIN32
 void openpgm()
 {
-	ShellExecute(NULL,L"Open",L"D:\\Program Files\\IrfanView\\i_view32.exe",L"H:\\raytracing\\Raytracing\\Raytracing\\img.pgm",NULL,SW_SHOWNORMAL);
+	ShellExecute(NULL,L"Open",L"D:\\Program Files\\IrfanView\\i_view32.exe",L"H:\\raytracing\\Raytracing\\Raytracing\\img.pgm",NULL,SW_SHOWMAXIMIZED);
 }
 #endif
 
@@ -137,272 +42,9 @@ void openpgm()
 //x1 y1 z1 x2 y2 z2 x3 y3 z3 Color (-1 == mirror)
 //...
 
-int openmodel(const char *filename, model *ModelPoint)
-{
-	int n = 0, i = 0;
-	int materialnum = 0;
-	char temp[30];
-	ifstream in(filename);
-	if (!in)
-	{
-		cout <<"Cannot open file "<<filename<<"\n";
-		return 0;
-	}
-	
-	bool end = false;
-	ModelPoint->trianglesnum = 0;
-	ModelPoint->spheresnum = 0;
-	while (!end)
-	{
-	in >> temp;
-	if (strcmp(temp,trianglestring)==0)
-	{
-		char m[30];
-		in >> m;
-		for (i = 0; i < materialnum; i++)
-		{
-			if (strcmp(m,materials[i].name) ==0)
-			{
-				ModelPoint->triangles[ModelPoint->trianglesnum].material = materials[i];
-			}
-		}
-		in >> ModelPoint->triangles[ModelPoint->trianglesnum].A.x;
-		in >> ModelPoint->triangles[ModelPoint->trianglesnum].A.y;
-		in >> ModelPoint->triangles[ModelPoint->trianglesnum].A.z;
-		in >> ModelPoint->triangles[ModelPoint->trianglesnum].B.x;
-		in >> ModelPoint->triangles[ModelPoint->trianglesnum].B.y;
-		in >> ModelPoint->triangles[ModelPoint->trianglesnum].B.z;
-		in >> ModelPoint->triangles[ModelPoint->trianglesnum].C.x;
-		in >> ModelPoint->triangles[ModelPoint->trianglesnum].C.y;
-		in >> ModelPoint->triangles[ModelPoint->trianglesnum].C.z;
-		ModelPoint->trianglesnum ++;
-	}
-	else if (strcmp(temp,spherestring) == 0)
-	{
-		char m[30];
-		in >>m;
-		for (i = 0; i < materialnum; i++)
-		{
-			if (strcmp(m,materials[i].name) == 0)
-			{
-			ModelPoint->spheres[ModelPoint->spheresnum].material = materials[i];
-			}
-		}
-		in >> ModelPoint->spheres[ModelPoint->spheresnum].R;
-		in >> ModelPoint->spheres[ModelPoint->spheresnum].C.x;
-		in >> ModelPoint->spheres[ModelPoint->spheresnum].C.y;
-		in >> ModelPoint->spheres[ModelPoint->spheresnum].C.z;
-		ModelPoint->spheresnum ++;
-	}
-	else if(strcmp(temp,materialstring)==0)
-	{
-		in>>materials[materialnum].name;
-		in>>materials[materialnum].reflectfactor;
-		in>>materials[materialnum].scatterfactor;
-		in>>materials[materialnum].Color.g;
-		materialnum++;
-	}
-	else if (strcmp(temp,lightstring)==0)
-	{
-		in >> ModelPoint->lightspot.x;
-		in >> ModelPoint->lightspot.y;
-		in >> ModelPoint->lightspot.z;
-	}
-	else if(strcmp(temp,camerastring)==0)
-	{
-		in >> ModelPoint->camera.x;
-		in >> ModelPoint->camera.y;
-		in >> ModelPoint->camera.z;
-	}
-	else if(strcmp(temp,targetstring)==0)
-	{
-		in >> ModelPoint->cameratarget.x;
-		in >> ModelPoint->cameratarget.y;
-		in >> ModelPoint->cameratarget.z;
-	}
-	else 
-	{
-		end = true;
-	}
-	
-	}
-	in.close();
-	return 1;
-    
-}
 
-bool triangleIntersect(vector &resultpoint,double &resultt, double &mint, const vector &camera,  vector &ray, const triangle &tr, bool light)
-{
-	vector normal;
-	vector temp1;
-	vector temp2;
-	cross(normal, subtract(temp1,tr.B,tr.A),subtract(temp2,tr.C,tr.B));
-	double A = normal.x;
-	double B = normal.y;
-	double C = normal.z;
-	double D = - A*tr.A.x - B*tr.A.y - C*tr.A.z;
-	if (light) scale(normal,-1.0);
-	double denominator = scalarproduct(normal,ray);
-	if (denominator == 0)
-	{
-		return false;
-	}
-	else
-	{
-		resultt = -(D + scalarproduct(normal,camera))/denominator;
-		
-		if ((resultt>0)&&(resultt<1)&&(mint == 1)) 
-		{
-			int trololo = 0;
-		}
-		if ((resultt<mint)&&(resultt>0))
-		{
-			vector AB,BC,CA;
-			double j1=0,j2=0,j3=0;
-			subtract(AB, tr.A,tr.B);
-			subtract(BC,tr.B,tr.C);
-			subtract(CA,tr.C,tr.A);
-			vector cloneray;
-			cloneray.x = ray.x;
-			cloneray.y = ray.y;
-			cloneray.z = ray.z;
-			add(resultpoint,camera,scale(cloneray,resultt));
-			//scale(ray,1/resultt);
-			if((fabs(normal.z)>=fabs(normal.y))&&(fabs(normal.z)>=fabs(normal.x)))
-			{
-			j1 = (resultpoint.y - tr.A.y)*(tr.B.x - tr.A.x) - (resultpoint.x - tr.A.x)*(tr.B.y - tr.A.y);
-			j2 = (resultpoint.y - tr.B.y)*(tr.C.x - tr.B.x) - (resultpoint.x - tr.B.x)*(tr.C.y - tr.B.y);
-			j3 = (resultpoint.y - tr.C.y)*(tr.A.x - tr.C.x) - (resultpoint.x - tr.C.x)*(tr.A.y - tr.C.y);
-			}
-			if (((j1>0)&&(j2>0)&&(j3>0))||((j1<0)&&(j2<0)&&(j3<0)))
-			{
-				mint = resultt;
-			return true;
-			}
-			else 
-			{
-				if((fabs(normal.y)>=fabs(normal.z))&&(fabs(normal.y)>=fabs(normal.x)))
-				{
-				j1 = (resultpoint.z - tr.A.z)*(tr.B.x - tr.A.x) - (resultpoint.x - tr.A.x)*(tr.B.z - tr.A.z);
-				j2 = (resultpoint.z - tr.B.z)*(tr.C.x - tr.B.x) - (resultpoint.x - tr.B.x)*(tr.C.z - tr.B.z);
-				j3 = (resultpoint.z - tr.C.z)*(tr.A.x - tr.C.x) - (resultpoint.x - tr.C.x)*(tr.A.z - tr.C.z);
-				}
-				if (((j1>0)&&(j2>0)&&(j3>0))||((j1<0)&&(j2<0)&&(j3<0)))
-				{
-					mint = resultt;
-					return true;
-				}
-				else
-				{
-					if((fabs(normal.x)>=fabs(normal.y))&&(fabs(normal.x)>=fabs(normal.z)))
-					{
-					j1 = (resultpoint.z - tr.A.z)*(tr.B.y - tr.A.y) - (resultpoint.y - tr.A.y)*(tr.B.z - tr.A.z);
-					j2 = (resultpoint.z - tr.B.z)*(tr.C.y - tr.B.y) - (resultpoint.y - tr.B.y)*(tr.C.z - tr.B.z);
-					j3 = (resultpoint.z - tr.C.z)*(tr.A.y - tr.C.y) - (resultpoint.y - tr.C.y)*(tr.A.z - tr.C.z);
-					}
-					if (((j1>0)&&(j2>0)&&(j3>0))||((j1<0)&&(j2<0)&&(j3<0)))
-					{
-						mint = resultt;
-						return true;
-					}
-					else return false;
-				}
-			}
-		}
-		else return false;
-	}
 
-}
 
-bool sphereIntersect(double &resultt, double &mint, const vector &camera, vector &ray,const sphere &sph)
-{
-	double det,b;
-	vector camcent;
-	subtract(camcent,camera,sph.C);
-	b = -scalarproduct(camcent,ray);
-	det = b*b - scalarproduct(camcent,camcent)*scalarproduct(ray,ray) + sph.R*sph.R*scalarproduct(ray,ray);
-	if (det<0)
-	{
-		return false;
-	}
-	det = sqrt(det);
-	double temp1, temp2;
-	temp1 = (b + det)/scalarproduct(ray,ray);
-	if (temp1 < 0) return false;
-	else
-	{
-		double temp2 = (b - det)/scalarproduct(ray,ray);
-		if (temp2>0)
-		{
-			if ((temp2*temp2*(ray.x*ray.x + ray.y*ray.y + ray.z*ray.z) > 0.01))
-			temp1 = temp2;
-		}
-		if (temp1<mint)
-		{
-			//mint = temp1;
-			resultt = temp1;
-			if ((resultt*resultt*(ray.x*ray.x + ray.y*ray.y + ray.z*ray.z) > 0.01))
-			{
-				mint = temp1;
-				return true;
-			}
-			else return false;
-		}
-		else return false;
-	}
-	
-	
-}
-
-bool lighttrace(const vector &point, vector &ray, int itri, int &closesti, int objind)//objind sph = 0, tr = 1
-{
-	int i = 0;
-	vector hitpoint;
-	vector temp;
-	double t;
-	bool hitexists = false;
-	double min = 1;
-	closesti = -1;
-	bool hittr = false;
-	bool hitsph = false;
-	for (i = 0; i<Model.spheresnum; i++)
-	{
-		if (/*(i!=itri)||(objind!=0)*/1)
-			if (sphereIntersect(t,min,point,ray,Model.spheres[i]))
-			{
-				hitexists = true;
-				hitsph = true;
-				hittr = false;
-				closesti = i;
-			}
-	}
-
-	for (i = 0; i<Model.trianglesnum; i++)
-		{
-			if ((i!=itri)||(objind!=1))
-			if (triangleIntersect(hitpoint,t,min,point,ray,Model.triangles[i],false))
-			{
-				hitexists = true;
-				hitsph = false;
-				hittr = true;
-				closesti = i;
-			}
-		}
-	/*if (hitexists)
-	{
-		if (Model.triangles[closesti].material.reflectfactor == 1.0)
-		{
-			mirror = true;
-		}
-		else 
-		{
-			mirror = false;
-		}
-		return false;
-	}*/
-		if (hitexists) return false;
-		else return true;
-}
 
 
 /*bool lightIntersect(const vector &cam,vector &ray, double R)
@@ -693,7 +335,8 @@ void raytrace( color* final, const vector &cam, vector &ray, int it, int depth, 
 void render(int width, int height)
 {
 	int i,j,k,m,n;
-	int goal = width*height;
+	int g = 0;
+	int goal = width*height/10;
     color *Color;
     Color = (color*)malloc(sizeof(color));
     memset(pictureArray,0,sizeof(pictureArray));
@@ -711,9 +354,9 @@ void render(int width, int height)
     mainvector.z = Model.cameratarget.z - Model.camera.z;
 
     double di,dj;
-    double g;
+    //double g;
     for(i=0; i<width; i++)
-        for(j=0; j<height; j++)
+       for(j=0; j<height; j++)
         {
             di = (double)i;
             dj = (double)j;
@@ -732,15 +375,30 @@ void render(int width, int height)
 					ray.x = Model.cameratarget.x+side.x+up.x - Model.camera.x;
                     ray.y = Model.cameratarget.y+side.y+up.y - Model.camera.y;
                     ray.z = Model.cameratarget.z+side.z+up.z - Model.camera.z;
-
+					color diffuse;
+					diffuse.g = 0;
+					vector tempray;
+					tempray.x = ray.x;
+					tempray.y = ray.y;
+					tempray.z = ray.z;
 					raytrace( Color, Model.camera, ray, -1, 0, -1);
+					if (Color->g < DIFFUSECOLORTHRESHOLD)
+					{diffusetrace(&diffuse, Model.camera, tempray, -1, 0 , -1);
+					Color->g+= diffuse.g;}
+					if (Color->g>1) Color->g = 1;
 			pictureArray[i][j] = (unsigned char)(Color->g * 255);
-			if ((((i*(j-1) +j)*100)%(goal*3)) == 0) cout << ".";
+			//if ((((i*(j-1) +j)*100)%(goal*3)) == 0) cout << ".";
+			int subgoal = ((i*(height) + j));
+			if (subgoal >= g)
+			{
+				g += goal;
+				cout << int((subgoal*10)/goal) << "%..";
+			}
         }
 
 	//##########################################################
-/*			di = 453;
-            dj = 289;
+/*			di = 35;
+            dj = 40;
                     vector side;
                     side.x =  mainvector.y;
                     side.y = -mainvector.x;
@@ -756,8 +414,17 @@ void render(int width, int height)
 					ray.x = Model.cameratarget.x+side.x+up.x - Model.camera.x;
                     ray.y = Model.cameratarget.y+side.y+up.y - Model.camera.y;
                     ray.z = Model.cameratarget.z+side.z+up.z - Model.camera.z;
-
-					raytrace( Color, Model.camera, ray,-1,0,-1);
+					color diffuse;
+					diffuse.g = 0;
+					vector tempray;
+					tempray.x = ray.x;
+					tempray.y = ray.y;
+					tempray.z = ray.z;
+					raytrace( Color, Model.camera, ray, -1, 0, -1);
+					if (Color->g < 0.1)
+					{diffusetrace(&diffuse, Model.camera, tempray, -1, 0 , -1);
+					Color->g+= diffuse.g;}
+					if (Color->g>1) Color->g = 1;
 */
 	//#######################################################
 }
@@ -802,6 +469,7 @@ int main(int argc, char *argv[])
 	cout<<"raytracing...";
 	render(WIDTH,HEIGHT);
 	cout<<"done\n";
+
 
 	cout<<"saving file "<<ifile<<"...";
 	if (!savepgm(ifile,P_FORMAT,WIDTH,HEIGHT,COLORS)) return 0;
