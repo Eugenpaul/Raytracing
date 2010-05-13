@@ -45,6 +45,7 @@ int openmodel(const char *filename, model *ModelPoint)
 	bool end = false;
 	ModelPoint->trianglesnum = 0;
 	ModelPoint->spheresnum = 0;
+	ModelPoint->lightsnum = 0;
 	while (!end)
 	{
 	in >> temp;
@@ -97,9 +98,12 @@ int openmodel(const char *filename, model *ModelPoint)
 	}
 	else if (strcmp(temp,lightstring)==0)
 	{
-		in >> ModelPoint->lightspot.x;
-		in >> ModelPoint->lightspot.y;
-		in >> ModelPoint->lightspot.z;
+		in >> ModelPoint->lightspot[ModelPoint->lightsnum].Intensity;
+		in >> ModelPoint->lightspot[ModelPoint->lightsnum].R;
+		in >> ModelPoint->lightspot[ModelPoint->lightsnum].C.x;
+		in >> ModelPoint->lightspot[ModelPoint->lightsnum].C.y;
+		in >> ModelPoint->lightspot[ModelPoint->lightsnum].C.z;
+		ModelPoint->lightsnum++;
 	}
 	else if(strcmp(temp,camerastring)==0)
 	{
@@ -112,6 +116,46 @@ int openmodel(const char *filename, model *ModelPoint)
 		in >> ModelPoint->cameratarget.x;
 		in >> ModelPoint->cameratarget.y;
 		in >> ModelPoint->cameratarget.z;
+	}
+	else if (strcmp(temp,widthstring) == 0)
+	{
+		in >>renderv.width;
+	}
+	else if (strcmp(temp,heightstring) ==0)
+	{
+		in >> renderv.height;
+	}
+	else if (strcmp(temp,colorsstring) ==0)
+	{
+		in >> renderv.colors;
+	}
+	else if (strcmp(temp,reflectdepthstring) ==0)
+	{
+		in >>renderv.refdepth;
+	}
+	else if (strcmp(temp,diffusedepthstring) ==0)
+	{
+		in >> renderv.difdepth;
+	}
+	else if (strcmp(temp,diffusedetailstring) ==0)
+	{
+		in >> renderv.difdetail;
+	}
+	else if (strcmp(temp,lightdetailstring) ==0)
+	{
+		in >> renderv.lightdetail;
+	}
+	else if (strcmp(temp,k0string) ==0)
+	{
+		in >> renderv.K0;
+	}
+	else if (strcmp(temp,k1string) ==0)
+	{
+		in >> renderv.K1;
+	}
+	else if (strcmp(temp,k2string) ==0)
+	{
+		in >> renderv.K2;
 	}
 	else 
 	{

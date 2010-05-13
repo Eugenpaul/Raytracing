@@ -166,14 +166,25 @@ vector &mirror( vector &out, const vector &ray, const vector &normal )
 		}
 		else
 		{
-			n = (ray.y - (normal.y*ray.z)/normal.z)/(cross2.y - (normal.y*cross2.z)/normal.z);
+			n = (ray.y - (normal.y*ray.z)/normal.z);
+			n /= (cross2.y - (normal.y*cross2.z)/normal.z);
 			m = (ray.z - (cross2.z*n))/normal.z;
 		}
 	}
 	else
 	{
-		n = (ray.y - (normal.y*ray.x)/normal.x)/(cross2.y - (normal.y*cross2.x)/normal.x);
-		m = (ray.x - (cross2.x*n))/normal.x;
+		if ((ray.y != ray.x)||(normal.y != normal.x))
+		{
+			n = (ray.y - (normal.y*ray.x)/normal.x);
+			n /= (cross2.y - (normal.y*cross2.x)/normal.x);
+			m = (ray.x - (cross2.x*n))/normal.x;
+		}
+		else
+		{	
+			n = scalarproduct(ray,cross2)/(scalarproduct(cross2,cross2));
+			m = scalarproduct(ray,normal)/(scalarproduct(normal,normal));
+		}
+				
 	}
 
 	vector temp1, temp2;

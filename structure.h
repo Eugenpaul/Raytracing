@@ -1,5 +1,4 @@
 #pragma once
-//#include "vectormath.h"
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
@@ -9,21 +8,21 @@
 
 
 
-#define WIDTH 400
-#define HEIGHT 360
-#define COLORS 255
+#define MAXWIDTH 3000
+#define MAXHEIGHT 2500
+//#define COLORS 255
 #define DEFAULTCOLOR 0.0
 #define MATERIALNAMESIZE 30
-#define MATERIALSNUM 5
-#define MAXDEPTH 4
-#define MAXDIFFUSEDEPTH 1
-#define DIFFUSERAYSNUM 30
+#define MATERIALSNUM 10
+//#define MAXDEPTH 4
+//#define MAXDIFFUSEDEPTH 1
+//#define DIFFUSERAYSNUM 10
 #define DIFFUSEADDITION 100
 #define DIFFUSECOLORTHRESHOLD 1
-#define K0 0.1
-#define K1 0.3
-#define K2 0.5
-#define LIGHT 500
+//#define LIGHTDOTS	10
+//#define K0 0.1
+//#define K1 0.2
+//#define K2 0.5
 extern const char* mode;
 #define P_FORMAT 2
 
@@ -43,6 +42,16 @@ extern const char *scatterstring;// = "scatter";
 extern const char *colorstring;// = "color";
 extern const char *trianglestring;// = "triangle";
 extern const char *spherestring;// = "sphere";
+extern const char *widthstring;// = "width";
+extern const char *heightstring;// = "height";
+extern const char *colorsstring;// = "colors";
+extern const char *reflectdepthstring;// = "refdepth";
+extern const char *diffusedepthstring;// = "difdepth";
+extern const char *diffusedetailstring; // = "difdetail";
+extern const char *lightdetailstring;// = "lightdetail";
+extern const char *k0string;// = "k0";
+extern const char *k1string;// = "k1";
+extern const char *k2string;// = "k2";
 
 
 typedef struct colorstruct
@@ -56,6 +65,13 @@ typedef struct vectorstruct
 	double y;
 	double z;
 }vector;
+
+typedef struct lightstruct
+{
+	vector C;
+	double R;
+	double Intensity;
+}lightr;
 
 typedef struct materialstruct
 {
@@ -82,7 +98,8 @@ typedef struct sphere
 
 typedef struct modelstruct
 {
-	vector lightspot;
+	int lightsnum;
+	lightr lightspot[10];
 	vector camera;
 	vector cameratarget;
 	int trianglesnum;
@@ -92,8 +109,23 @@ typedef struct modelstruct
 
 }model;
 
+typedef struct renderq
+{
+	int width;
+	int height;
+	int colors;
+	int refdepth;
+	int difdepth;
+	int lightdetail;
+	int difdetail;
+	double K0;
+	double K1;
+	double K2;
+}rend;
+
 
 
 extern Material materials[MATERIALSNUM];
 extern model Model;
-extern unsigned char pictureArray[WIDTH][HEIGHT];
+extern rend renderv; 
+extern unsigned char pictureArray[MAXWIDTH][MAXHEIGHT];
