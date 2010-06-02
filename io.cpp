@@ -48,6 +48,7 @@ int openmodel(const char *filename, model *ModelPoint)
 	ModelPoint->lightsnum = 0;
 	while (!end)
 	{
+	temp[0] = 0;
 	in >> temp;
 	if (strcmp(temp,trianglestring)==0)
 	{
