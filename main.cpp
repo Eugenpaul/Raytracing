@@ -15,21 +15,21 @@
 #include "tracing.h"
 
 
-#ifdef WIN32
+/*#ifdef WIN32
 #include <windows.h>
 #include <Shellapi.h>
-#endif
+#endif*/
 
 using namespace std;
 
 
 
-#ifdef WIN32
+/*#ifdef WIN32
 void openpgm()
 {
 	ShellExecute(NULL,L"Open",L"D:\\Program Files\\IrfanView\\i_view32.exe",L"H:\\raytracing\\Raytracing\\Raytracing\\img.pgm",NULL,SW_SHOWMAXIMIZED);
 }
-#endif
+#endif*/
 
 
 void render(int width, int height)
@@ -97,7 +97,7 @@ void render(int width, int height)
 			if (subgoal >= g)
 			{
 				g += goal;
-				cout << int((subgoal*10)/goal) << "%..";
+				cout << int((subgoal*10)/goal) << "%.." << flush;
 			}
         }
 
@@ -136,10 +136,10 @@ void render(int width, int height)
 
 int main(int argc, char *argv[])
 {
-	char mfile[30];
-	char ifile[30];
-	memset(mfile,0,30);
-	memset(ifile,0,30);
+	char mfile[90];
+	char ifile[90];
+	memset(mfile,0,90);
+	memset(ifile,0,90);
 	int i = 1;
 			
 	if (argc >=2)
@@ -165,8 +165,17 @@ int main(int argc, char *argv[])
 				
 		}
 	}
-	if (strcmp(mfile,"") == 0) strncpy(mfile,modelfile,strlen(modelfile));
-	if (strcmp(ifile,"") ==0) strncpy(ifile,pgmname,strlen(pgmname));
+	if (strcmp(mfile,"") == 0)
+	{
+		cout<<"Usage: -m <model_filename> -i <image_filename>"<<endl;
+		return 0;
+	} 
+	//strncpy(mfile,modelfile,strlen(modelfile));
+	if (strcmp(ifile,"") ==0)
+	{
+	 strncpy(ifile,mfile,strlen(mfile));
+	 strncat(ifile,".pgm\0",6);
+	}
 	cout<<"opening file "<<mfile<<"...";
 	if (!openmodel(mfile,&Model)) return 0;
 	cout<<"done"<<endl;
@@ -180,7 +189,7 @@ int main(int argc, char *argv[])
 	if (!savepgm(ifile,P_FORMAT,renderv.width,renderv.height,renderv.colors)) return 0;
 	cout<<"done"<<endl;
 	#ifdef WIN32
-	openpgm();
+	//openpgm();
 	#endif
 	return 0;
 }
