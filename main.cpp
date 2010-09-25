@@ -10,33 +10,104 @@
 #include "structure.h"
 #define STRUCTURE_H
 #endif
+#include "sys/time.h"
 #include "vectormath.h"
 #include "io.h"
 #include "tracing.h"
+#include "tbb/tbb.h"
+#include "tbb/parallel_for.h"
+#include "tbb/task_scheduler_init.h"
+using namespace tbb;
 
 
-#ifdef WIN32
+/*#ifdef WIN32
 #include <windows.h>
 #include <Shellapi.h>
-#endif
+#endif*/
 
 using namespace std;
 
 
 
-#ifdef WIN32
+/*#ifdef WIN32
 void openpgm()
 {
 	ShellExecute(NULL,L"Open",L"D:\\Program Files\\IrfanView\\i_view32.exe",L"H:\\raytracing\\Raytracing\\Raytracing\\img.pgm",NULL,SW_SHOWMAXIMIZED);
 }
-#endif
+#endif*/
 
+
+
+class CRender
+{
+
+int height, width;
+vector m;
+color *c;
+
+public:
+
+  CRender(int w, int h, vector mainv, color *C)
+  {
+    height = h;
+    width = w;
+    m = mainv;
+    c = C;
+    
+  }
+  
+  void operator() (const blocked_range<int>& range) const
+  {
+    double di, dj;
+    int i, j;
+    double tarw = 1.0;
+    double pixpitch = tarw/(double)width;
+    vector mainvector = m;
+    color *Color = c;
+    for (i = range.begin(); i != range.end(); i++)
+      for (j = 0; j < height; j++)
+      {
+        di = (double)i;
+        dj = (double)j;
+        vector side;
+        side.x = mainvector.y;
+        side.y = -mainvector.x;
+        side.z = 0.0;
+        vector up;
+        cross(up, mainvector, side);
+        normalize(side, (di - (double)width/2.0)*pixpitch);
+        normalize(up, (dj - (double)height/2.0)*pixpitch);
+        vector ray;
+        ray.x = Model.cameratarget.x + side.x + up.x - Model.camera.x;
+        ray.y = Model.cameratarget.y + side.y + up.y - Model.camera.y;
+        ray.z = Model.cameratarget.z + side.z + up.z - Model.camera.z;
+        vector tempray;
+        tempray.x = ray.x;
+        tempray.y = ray.y;
+        tempray.z = ray.z;
+        raytrace(Color, Model.camera, ray, -1, 0, -1);
+        pictureArray[i][j] = (unsigned char)(Color->g*255);
+        
+      }
+      printf("processing...\n");
+      
+  }
+    
+};
 
 void render(int width, int height)
 {
 	int i,j,k,m,n;
 	int g = 0;
 	int goal = width*height/10;
+
+        struct timeval start, end;
+        long mtime=0, seconds=0, useconds=0;
+        
+        gettimeofday(&start, NULL);
+        
+        printf("render starts\n");
+        
     color *Color;
     Color = (color*)malloc(sizeof(color));
     memset(pictureArray,0,sizeof(pictureArray));
@@ -56,7 +127,16 @@ void render(int width, int height)
 	diffuse.g = 0;
     double di,dj;
     //double g;
-    for(i=0; i<width; i++)
+    task_scheduler_init init;
+    parallel_for(blocked_range<int>(0,width),CRender(width, height, mainvector, Color) );
+    init.terminate();
+    printf("done\nparallel_for done\n");   
+    gettimeofday(&end, NULL);
+    seconds = end.tv_sec - start.tv_sec;
+    useconds = end.tv_usec - start.tv_usec;
+    mtime = ((seconds) *1000 + useconds/1000.0) + 0.5;
+    printf("elapsed time: %ld ms\n", mtime);
+   /* for(i=0; i<width; i++)
        for(j=0; j<height; j++)
         {
             di = (double)i;
@@ -97,9 +177,10 @@ void render(int width, int height)
 			if (subgoal >= g)
 			{
 				g += goal;
-				cout << int((subgoal*10)/goal) << "%..";
+				cout << int((subgoal*10)/goal) << "%.." << flush;
 			}
-        }
+        }*/
+        
 
 	//##########################################################
 /*			di = 35;
@@ -136,10 +217,10 @@ void render(int width, int height)
 
 int main(int argc, char *argv[])
 {
-	char mfile[30];
-	char ifile[30];
-	memset(mfile,0,30);
-	memset(ifile,0,30);
+	char mfile[90];
+	char ifile[90];
+	memset(mfile,0,90);
+	memset(ifile,0,90);
 	int i = 1;
 			
 	if (argc >=2)
@@ -165,8 +246,17 @@ int main(int argc, char *argv[])
 				
 		}
 	}
-	if (strcmp(mfile,"") == 0) strncpy(mfile,modelfile,strlen(modelfile));
-	if (strcmp(ifile,"") ==0) strncpy(ifile,pgmname,strlen(pgmname));
+	if (strcmp(mfile,"") == 0)
+	{
+		cout<<"Usage: -m <model_filename> -i <image_filename>"<<endl;
+		return 0;
+	} 
+	//strncpy(mfile,modelfile,strlen(modelfile));
+	if (strcmp(ifile,"") ==0)
+	{
+	 strncpy(ifile,mfile,strlen(mfile));
+	 strncat(ifile,".pgm\0",6);
+	}
 	cout<<"opening file "<<mfile<<"...";
 	if (!openmodel(mfile,&Model)) return 0;
 	cout<<"done"<<endl;
@@ -180,7 +270,7 @@ int main(int argc, char *argv[])
 	if (!savepgm(ifile,P_FORMAT,renderv.width,renderv.height,renderv.colors)) return 0;
 	cout<<"done"<<endl;
 	#ifdef WIN32
-	openpgm();
+	//openpgm();
 	#endif
 	return 0;
 }
