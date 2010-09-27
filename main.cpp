@@ -38,6 +38,9 @@ void openpgm()
 
 
 
+typedef queuing_rw_mutex Lock;
+Lock lock;
+
 class CRender
 {
 
@@ -47,13 +50,11 @@ color *c;
 
 public:
 
-  CRender(int w, int h, vector mainv, color *C)
+  CRender(int w, int h, vector mainv)
   {
     height = h;
     width = w;
     m = mainv;
-    c = C;
-    
   }
   
   void operator() (const blocked_range<int>& range) const
@@ -62,11 +63,17 @@ public:
     int i, j;
     double tarw = 1.0;
     double pixpitch = tarw/(double)width;
+    unsigned char pa = 0;
     vector mainvector = m;
-    color *Color = c;
+    //color *Color = c;
+    color *Color = (color*)malloc(sizeof(color));
+    //color *diffuse = (color*)malloc(sizeof(color));
+    color diffuse;
     for (i = range.begin(); i != range.end(); i++)
       for (j = 0; j < height; j++)
       {
+        Color->g = 0;
+        diffuse.g = 0;
         di = (double)i;
         dj = (double)j;
         vector side;
@@ -85,11 +92,21 @@ public:
         tempray.x = ray.x;
         tempray.y = ray.y;
         tempray.z = ray.z;
-        raytrace(Color, Model.camera, ray, -1, 0, -1);
-        pictureArray[i][j] = (unsigned char)(Color->g*255);
+        raytrace( Color, Model.camera, ray, -1, 0, -1);
+	if (Color->g < DIFFUSECOLORTHRESHOLD)
+	{
+          diffusetrace(&diffuse, Model.camera, tempray, -1, 0 , -1);
+          Color->g += diffuse.g;
+        }
+       
+        //Color->g += diffuse.g;
+          if (Color->g >1) Color -> g = 1;
+          pa = (unsigned char)(Color->g*255);
+          //unsigned char pa = Color->g*255;
+          memcpy(&pictureArray[i][j],&pa,sizeof(unsigned char));
         
       }
-      printf("processing...\n");
+      printf("processing %d - %d x %d \n", range.begin(), range.end(), height );
       
   }
     
@@ -128,7 +145,7 @@ void render(int width, int height)
     double di,dj;
     //double g;
     task_scheduler_init init;
-    parallel_for(blocked_range<int>(0,width),CRender(width, height, mainvector, Color) );
+    parallel_for(blocked_range<int>(0,width),CRender(width, height, mainvector) );
     init.terminate();
     printf("done\nparallel_for done\n");   
     gettimeofday(&end, NULL);
